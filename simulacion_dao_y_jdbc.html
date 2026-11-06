@@ -80,6 +80,43 @@
         .glow-active {
             box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
         }
+
+        /* Combo de métodos dentro del visor PersonaDAO.java */
+        .code-op-select {
+            max-width: 240px;
+        }
+        .code-op-select:hover {
+            border-color: #38bdf8;
+        }
+        .code-op-select optgroup {
+            color: #94a3b8;
+            font-style: normal;
+        }
+        .code-op-select option {
+            color: #7dd3fc;
+        }
+        select:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .code-op-wrap { flex-shrink: 0; }
+        .pkg-badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        @media (max-width: 1535px) {
+            .code-op-label { display: none !important; }
+        }
+        @media (max-width: 1279px) {
+            .code-op-select { max-width: 200px; }
+            .pkg-prefix { display: none; }
+        }
+
+        /* Aparición suave del código al cambiar de método */
+        @keyframes codeFade {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .code-fade {
+            animation: codeFade 0.25s ease;
+        }
     </style>
 </head>
 <body class="h-full flex flex-col bg-slate-950 text-slate-100 font-sans antialiased overflow-hidden">
@@ -147,12 +184,18 @@
 
         <!-- LEFT PANEL: PersonaDAO Code Viewer (5 cols) -->
         <section class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-xl flex flex-col overflow-hidden shadow-lg">
-            <div class="bg-slate-950 border-b border-slate-800 px-3 py-2 flex items-center justify-between">
-                <span class="text-xs font-mono font-medium text-slate-300 flex items-center gap-2">
+            <div class="bg-slate-950 border-b border-slate-800 px-3 py-2 flex items-center justify-between gap-2">
+                <span class="text-xs font-mono font-medium text-slate-300 flex items-center gap-2 shrink-0">
                     <i class="fa-solid fa-file-code text-sky-400"></i> PersonaDAO.java
                 </span>
-                <span class="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded font-mono">
-                    paquete: modelo.dao
+                <!-- Combo de métodos: al elegir uno se carga su código y su recorrido -->
+                <div class="code-op-wrap flex items-center gap-1.5">
+                    <label for="codeOperationSelect" class="code-op-label hidden sm:inline text-[10px] text-slate-400 font-mono shrink-0">Método:</label>
+                    <select id="codeOperationSelect" onchange="changeOperation(this.value)" title="Elegir el método de PersonaDAO que se carga en el visor" class="code-op-select bg-slate-900 border border-sky-500/30 text-[11px] text-sky-300 font-mono rounded-lg px-2 py-1 focus:outline-none focus:border-sky-500 cursor-pointer min-w-0 truncate">
+                    </select>
+                </div>
+                <span class="pkg-badge text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-2 py-0.5 rounded font-mono" title="paquete: modelo.dao">
+                    <span class="pkg-prefix">paquete: </span>modelo.dao
                 </span>
             </div>
 
@@ -427,7 +470,9 @@
              las operaciones (lo que se agrega, modifica o elimina se ve al
              volver a getLista()).
            - ESCENARIOS: un objeto por operación del PersonaDAO. Cada uno tiene:
-               id, nombre, tipo ('lista' | 'consulta' | 'escritura'),
+               id, nombre (texto del menú de arriba),
+               metodo (texto del combo "Método:" del visor PersonaDAO.java),
+               tipo ('lista' | 'consulta' | 'escritura'),
                usaFase5, casos (los "¿Qué pasaría si...?"),
                datos (qué datos de entrada pide: codigo, nombre),
                codigo(caso)  -> líneas de Java a mostrar,
@@ -436,8 +481,13 @@
            - El motor (updateUI, controles, renderizadores) funciona igual
              para cualquier escenario.
 
+           - Hay dos combos de operación sincronizados: el del encabezado
+             (#operationSelect) y el del visor PersonaDAO.java
+             (#codeOperationSelect). Elegir en cualquiera de los dos carga el
+             código del método y su recorrido paso a paso.
+
            CÓMO AGREGAR UN ESCENARIO NUEVO
-           1. Copiar uno de los objetos de ESCENARIOS y cambiar id y nombre.
+           1. Copiar uno de los objetos de ESCENARIOS y cambiar id, nombre y metodo.
            2. Escribir su código en codigo(caso), idéntico al del proyecto.
            3. En pasos(caso), usar nuevoRecorrido(lineas) y llamar a
               r.paso(textoDeLaLinea, fase, explicacion, estado, cambios, extra)
@@ -532,7 +582,7 @@
 
             /* ------------------------- 1. getLista() ------------------------- */
             {
-                id: "getLista", nombre: "Consulta: getLista()", tipo: "lista", usaFase5: true, datos: [],
+                id: "getLista", nombre: "Consulta: getLista()", metodo: "getLista() · SELECT", tipo: "lista", usaFase5: true, datos: [],
                 casos: [
                     { id: "normal", nombre: "Recorrido normal" },
                     { id: "vacia", nombre: "¿Y si la tabla está vacía?" },
@@ -680,7 +730,7 @@ public ArrayList<PersonaVO> getLista() {
 
             /* --------------------- 2. obtenerXCodigo() ---------------------- */
             {
-                id: "obtenerXCodigo", nombre: "Búsqueda: obtenerXCodigo()", tipo: "consulta", usaFase5: true, datos: ["codigo"],
+                id: "obtenerXCodigo", nombre: "Búsqueda: obtenerXCodigo()", metodo: "obtenerXCodigo(int) · SELECT…WHERE", tipo: "consulta", usaFase5: true, datos: ["codigo"],
                 casos: [
                     { id: "normal", nombre: "Recorrido normal" },
                     { id: "no_existe", nombre: "¿Y si el código no existe?" },
@@ -796,7 +846,7 @@ public PersonaVO obtenerXCodigo(int cod) {
 
             /* --------------------------- 3. agregar() --------------------------- */
             {
-                id: "agregar", nombre: "Alta: agregar()", tipo: "escritura", usaFase5: false, sinFase5: "INSERT no devuelve ResultSet",
+                id: "agregar", nombre: "Alta: agregar()", metodo: "agregar(PersonaVO) · INSERT", tipo: "escritura", usaFase5: false, sinFase5: "INSERT no devuelve ResultSet",
                 datos: ["codigo", "nombre"],
                 casos: [
                     { id: "normal", nombre: "Recorrido normal" },
@@ -907,7 +957,7 @@ public String agregar(PersonaVO p) {
 
             /* -------------------------- 4. actualizar() -------------------------- */
             {
-                id: "actualizar", nombre: "Modificación: actualizar()", tipo: "escritura", usaFase5: false, sinFase5: "UPDATE no devuelve ResultSet",
+                id: "actualizar", nombre: "Modificación: actualizar()", metodo: "actualizar(PersonaVO) · UPDATE", tipo: "escritura", usaFase5: false, sinFase5: "UPDATE no devuelve ResultSet",
                 datos: ["codigo", "nombre"],
                 casos: [
                     { id: "normal", nombre: "Recorrido normal" },
@@ -1052,7 +1102,7 @@ public String actualizar(PersonaVO p) {
 
             /* --------------------------- 5. eliminar() --------------------------- */
             {
-                id: "eliminar", nombre: "Baja: eliminar()", tipo: "escritura", usaFase5: false, sinFase5: "DELETE no devuelve ResultSet",
+                id: "eliminar", nombre: "Baja: eliminar()", metodo: "eliminar(int) · DELETE", tipo: "escritura", usaFase5: false, sinFase5: "DELETE no devuelve ResultSet",
                 datos: ["codigo"],
                 casos: [
                     { id: "normal", nombre: "Recorrido normal" },
@@ -1197,6 +1247,11 @@ public String eliminar(int codigo) {
         function renderCode() {
             const container = document.getElementById("codeContainer");
             container.innerHTML = "";
+            container.scrollTop = 0;
+            /* animación corta para que se note que se cargó otro método */
+            container.classList.remove("code-fade");
+            void container.offsetWidth;
+            container.classList.add("code-fade");
             escenario.codigo(caso).forEach((line, idx) => {
                 const div = document.createElement("div");
                 div.id = `code-line-${idx}`;
@@ -1433,10 +1488,26 @@ public String eliminar(int codigo) {
 
         function cargarOperaciones() {
             const sel = document.getElementById("operationSelect");
+            const selCodigo = document.getElementById("codeOperationSelect");
             const visibles = operacionesVisibles();
             sel.innerHTML = visibles.map(e => `<option value="${e.id}">${e.nombre}</option>`).join("");
-            /* con una sola operación, el menú se muestra pero no se puede cambiar */
+
+            /* Combo del visor PersonaDAO.java: agrupa los métodos según cómo se ejecutan */
+            const grupos = [
+                { etiqueta: "Lectura · executeQuery()", tipos: ["lista", "consulta"] },
+                { etiqueta: "Escritura · executeUpdate()", tipos: ["escritura"] }
+            ];
+            selCodigo.innerHTML = grupos.map(g => {
+                const ops = visibles.filter(e => g.tipos.includes(e.tipo));
+                if (!ops.length) return "";
+                return `<optgroup label="${g.etiqueta}">` +
+                    ops.map(e => `<option value="${e.id}">${esc(e.metodo || e.nombre)}</option>`).join("") +
+                    `</optgroup>`;
+            }).join("");
+
+            /* con una sola operación, los menús se muestran pero no se pueden cambiar */
             sel.disabled = visibles.length === 1;
+            selCodigo.disabled = visibles.length === 1;
             return visibles;
         }
 
@@ -1453,6 +1524,9 @@ public String eliminar(int codigo) {
 
         function changeOperation(id) {
             escenario = ESCENARIOS.find(e => e.id === id);
+            /* los dos combos de operación muestran siempre la misma elección */
+            document.getElementById("operationSelect").value = id;
+            document.getElementById("codeOperationSelect").value = id;
             const selCaso = document.getElementById("whatIfSelect");
             selCaso.innerHTML = escenario.casos.map(k => `<option value="${k.id}">${k.nombre}</option>`).join("");
             caso = "normal";
